@@ -43,6 +43,7 @@ public class AuthController {
         return ResponseEntity.ok("User registered");
     }
 
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody User user, HttpSession session) {
         Optional<User> existingUser = userService.findByUsername(user.getUsername());
