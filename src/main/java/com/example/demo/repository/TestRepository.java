@@ -1,7 +1,8 @@
 package com.example.demo.repository;
 
 import com.example.demo.model.Test;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
-public interface TestRepository extends JpaRepository<Test, Long> {
+public interface TestRepository extends MongoRepository<Test, String> {
+    // Tu peux ajouter des méthodes personnalisées ici
 }
