@@ -1,17 +1,14 @@
 package com.example.demo.controller;
 
 import java.util.Optional;
-import jakarta.validation.Valid;
 
+import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.example.demo.model.User;
 import com.example.demo.service.UserService;
@@ -27,36 +24,56 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody User user, BindingResult result) {
-        // Vérification des erreurs de validation
         if (result.hasErrors()) {
             return ResponseEntity.badRequest().body(result.getAllErrors());
         }
 
-        // Vérifier si username existe déjà
         if (userService.findByUsername(user.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body("Username already exists");
         }
 
-        // Enregistrer l'utilisateur (penser à hacher le mot de passe dans le service)
         userService.register(user);
-
         return ResponseEntity.ok("User registered");
     }
-
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody User user, HttpSession session) {
         Optional<User> existingUser = userService.findByUsername(user.getUsername());
 
-        // Vérifier que l'utilisateur existe et que le mot de passe correspond
-        if (existingUser.isPresent() && existingUser.get().getPassword().equals(user.getPassword())) {
+        if (existingUser.isPresent()
+                && userService.checkPassword(user.getPassword(), existingUser.get().getPassword())) {
 
-            // Durée de session = 2 minutes (120 secondes)
             session.setMaxInactiveInterval(120);
-
             session.setAttribute("user", existingUser.get());
             return ResponseEntity.ok("Login successful");
         }
+
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable String id,
+                                        @Valid @RequestBody User updatedUser,
+                                        BindingResult result) {
+        if (result.hasErrors()) {
+            return ResponseEntity.badRequest().body(result.getAllErrors());
+        }
+
+        Optional<User> updated = userService.updateUser(id, updatedUser);
+        if (updated.isPresent()) {
+            return ResponseEntity.ok(updated.get());
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable String id) {
+        boolean deleted = userService.deleteUser(id);
+        if (deleted) {
+            return ResponseEntity.ok("User deleted");
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
     }
 }
