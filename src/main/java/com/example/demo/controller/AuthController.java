@@ -1,17 +1,14 @@
 package com.example.demo.controller;
 
 import java.util.Optional;
-import jakarta.validation.Valid;
 
+import jakarta.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.example.demo.model.User;
 import com.example.demo.service.UserService;
@@ -25,38 +22,146 @@ public class AuthController {
     @Autowired
     private UserService userService;
 
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody User user, BindingResult result) {
-        // Vérification des erreurs de validation
+    // SIGN UP - Inscription d'un nouvel utilisateur
+    @PostMapping("/signup")
+    public ResponseEntity<?> signup(@Valid @RequestBody User user, BindingResult result) {
         if (result.hasErrors()) {
             return ResponseEntity.badRequest().body(result.getAllErrors());
         }
 
-        // Vérifier si username existe déjà
+        // Vérifier si l'utilisateur existe déjà
         if (userService.findByUsername(user.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body("Username already exists");
         }
 
-        // Enregistrer l'utilisateur (penser à hacher le mot de passe dans le service)
-        userService.register(user);
+        // Vérifier si l'email existe déjà
+        if (userService.findByEmail(user.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().body("Email already exists");
+        }
 
-        return ResponseEntity.ok("User registered");
+        User registeredUser = userService.register(user);
+        
+        // Retourner l'utilisateur sans le mot de passe
+        User safeUser = new User();
+        safeUser.setId(registeredUser.getId());
+        safeUser.setUsername(registeredUser.getUsername());
+        safeUser.setEmail(registeredUser.getEmail());
+        safeUser.setPhone(registeredUser.getPhone());
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(safeUser);
     }
 
-
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User user, HttpSession session) {
+    // SIGN IN - Connexion d'un utilisateur existant
+    @PostMapping("/signin")
+    public ResponseEntity<?> signin(@RequestBody User user, HttpSession session) {
         Optional<User> existingUser = userService.findByUsername(user.getUsername());
 
-        // Vérifier que l'utilisateur existe et que le mot de passe correspond
-        if (existingUser.isPresent() && existingUser.get().getPassword().equals(user.getPassword())) {
+        if (existingUser.isPresent() 
+                && userService.checkPassword(user.getPassword(), existingUser.get().getPassword())) {
 
-            // Durée de session = 2 minutes (120 secondes)
+            // Créer la session (2 minutes d'inactivité)
             session.setMaxInactiveInterval(120);
-
             session.setAttribute("user", existingUser.get());
-            return ResponseEntity.ok("Login successful");
+
+            // Retourner l'utilisateur sans le mot de passe
+            User safeUser = new User();
+            safeUser.setId(existingUser.get().getId());
+            safeUser.setUsername(existingUser.get().getUsername());
+            safeUser.setEmail(existingUser.get().getEmail());
+            safeUser.setPhone(existingUser.get().getPhone());
+
+            return ResponseEntity.ok(safeUser);
         }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password");
+    }
+
+    // LOGIN - Vérification des coordonnées pour accéder à l'interface
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody User user, HttpSession session) {
+        // Vérifier si l'utilisateur est déjà connecté
+        User sessionUser = (User) session.getAttribute("user");
+        if (sessionUser != null) {
+            // L'utilisateur est déjà connecté, retourner ses infos
+            User safeUser = new User();
+            safeUser.setId(sessionUser.getId());
+            safeUser.setUsername(sessionUser.getUsername());
+            safeUser.setEmail(sessionUser.getEmail());
+            safeUser.setPhone(sessionUser.getPhone());
+            
+            return ResponseEntity.ok(safeUser);
+        }
+
+        // Sinon, vérifier les coordonnées
+        Optional<User> existingUser = userService.findByUsername(user.getUsername());
+
+        if (existingUser.isPresent() 
+                && userService.checkPassword(user.getPassword(), existingUser.get().getPassword())) {
+
+            // Créer la session
+            session.setMaxInactiveInterval(120);
+            session.setAttribute("user", existingUser.get());
+
+            // Retourner l'utilisateur sans le mot de passe
+            User safeUser = new User();
+            safeUser.setId(existingUser.get().getId());
+            safeUser.setUsername(existingUser.get().getUsername());
+            safeUser.setEmail(existingUser.get().getEmail());
+            safeUser.setPhone(existingUser.get().getPhone());
+
+            return ResponseEntity.ok(safeUser);
+        }
+
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+    }
+
+    // LOGOUT - Déconnexion
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpSession session) {
+        session.invalidate();
+        return ResponseEntity.ok("Logged out successfully");
+    }
+
+    // GET CURRENT USER - Récupérer l'utilisateur connecté
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(HttpSession session) {
+        User user = (User) session.getAttribute("user");
+        if (user != null) {
+            // Retourner l'utilisateur sans le mot de passe
+            User safeUser = new User();
+            safeUser.setId(user.getId());
+            safeUser.setUsername(user.getUsername());
+            safeUser.setEmail(user.getEmail());
+            safeUser.setPhone(user.getPhone());
+            
+            return ResponseEntity.ok(safeUser);
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not logged in");
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable String id,
+                                        @Valid @RequestBody User updatedUser,
+                                        BindingResult result) {
+        if (result.hasErrors()) {
+            return ResponseEntity.badRequest().body(result.getAllErrors());
+        }
+
+        Optional<User> updated = userService.updateUser(id, updatedUser);
+        if (updated.isPresent()) {
+            return ResponseEntity.ok(updated.get());
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable String id) {
+        boolean deleted = userService.deleteUser(id);
+        if (deleted) {
+            return ResponseEntity.ok("User deleted");
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
     }
 }
