@@ -21,6 +21,9 @@ public class TimeEntry {
     @NotBlank
     private String endTime; // format HH:mm
 
+    @NotBlank
+    private String clientId;
+
     private double hoursWorked; // calculé automatiquement
 
     // Getters et setters
@@ -36,4 +39,6 @@ public class TimeEntry {
     public void setEndTime(String endTime) { this.endTime = endTime; }
     public double getHoursWorked() { return hoursWorked; }
     public void setHoursWorked(double hoursWorked) { this.hoursWorked = hoursWorked; }
+    public String getClientId() { return clientId; }
+    public void setClientId(String clientId) { this.clientId = clientId; }
 } 

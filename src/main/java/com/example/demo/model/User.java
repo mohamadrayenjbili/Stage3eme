@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.util.List;
 
 
 
@@ -30,6 +31,9 @@ public class User {
     @NotBlank(message = "Phone number is mandatory")
     @Pattern(regexp = "^\\d{8}$", message = "Phone number must be exactly 8 digits")
     private String phone;
+
+    // Liste des IDs de clients associés (Many-to-Many)
+    private List<String> clientIds;
 
     // Getters et setters
     public String getId() {
@@ -71,4 +75,7 @@ public class User {
     public void setPhone(String phone) {
         this.phone = phone;
     }
+
+    public List<String> getClientIds() { return clientIds; }
+    public void setClientIds(List<String> clientIds) { this.clientIds = clientIds; }
 }
